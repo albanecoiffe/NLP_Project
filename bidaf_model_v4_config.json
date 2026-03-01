@@ -1,0 +1,9 @@
+{
+  "checkpoint": "bidaf_model_v4_best.pt",
+  "no_answer_threshold": 0.1,
+  "topk": 20,
+  "max_answer_len": 15,
+  "length_penalty": 0.02,
+  "max_context_len": 220,
+  "max_question_len": 40
+}
