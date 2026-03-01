@@ -96,6 +96,73 @@ Why SQuAD v2 is harder:
 - `bert-base-uncased` fine-tuning for QA.
 - Intended to push performance beyond from-scratch limits.
 
+
+## 5.1) Architecture Details (V5 only)
+
+### V5 (QAModelV5)
+V5 is the strongest from-scratch architecture in this project.
+
+#### Input / Embedding block
+1. Token IDs for context and question.
+2. Shared embedding layer.
+3. Embedding dropout for regularization.
+
+#### Encoding block
+1. Context encoder: 2-layer bidirectional LSTM.
+2. Question encoder: 2-layer bidirectional LSTM.
+3. Output tensors:
+   - `C` for context tokens
+   - `Q` for question tokens
+
+#### Attention + Fusion block (BiDAF-style)
+1. Similarity matrix: `S = C @ Q^T / sqrt(d)`.
+2. Context-to-question attention (`C2Q`).
+3. Question-to-context attention (`Q2C`).
+4. Feature fusion:
+   - `[C ; C2Q ; C*C2Q ; C*Q2C]`
+5. Projection + normalization:
+   - Linear -> ReLU -> Dropout -> LayerNorm
+
+#### Span Modeling block
+1. First bidirectional LSTM modeling layer.
+2. Second bidirectional LSTM modeling layer.
+3. Modeling dropout.
+
+Purpose:
+- increase capacity compared to V3,
+- better capture long-range dependencies before span prediction.
+
+#### Output heads
+1. Start head: linear projection -> start logits per context token.
+2. End head: linear projection -> end logits per context token.
+3. No-answer head:
+   - uses concatenation of context CLS token representation + question summary,
+   - MLP classifier producing one no-answer logit.
+
+#### Training objective
+Total loss combines:
+1. Span loss (cross-entropy on start + end).
+2. No-answer loss (BCEWithLogits).
+
+Formula (conceptually):
+- `L = L_start + L_end + alpha * L_no_answer`
+- where `alpha` is `V5_NO_ANSWER_WEIGHT`.
+
+#### Inference strategy (V5 optimized)
+At inference, V5 uses the calibrated decoding introduced in V4:
+1. No-answer thresholding (`no_answer_threshold`).
+2. Joint top-k start/end decoding.
+3. Max answer length constraint.
+4. Length penalty for overly long spans.
+
+This inference calibration is a major contributor to final EM/F1 gains.
+
+#### Why V5 is stronger
+- Deeper span modeling stack than V3.
+- Explicit no-answer head for SQuAD v2.
+- Better regularization (dropout + LayerNorm).
+- Strong calibrated decoding at inference time.
+
 ## 6) Main Notebooks and Usage
 
 ### A) Train from-scratch advanced model
